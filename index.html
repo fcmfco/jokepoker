@@ -3,126 +3,159 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>足球卡牌游戏 - 特殊卡牌与结算动画Demo</title>
+  <title>足球卡牌 Demo - 天赋树与打击感音效版</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Montserrat:wght@800;900&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      background-color: #0f141c;
+      background-color: #0b0f19;
       color: #ffffff;
       user-select: none;
+      overflow-x: hidden;
     }
     .font-number { font-family: 'Chakra Petch', sans-serif; }
     .font-title { font-family: 'Montserrat', sans-serif; }
     .card-shadow { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6); }
-    .pitch-bg { background: radial-gradient(circle at center, #1b4d3e 0%, #0d281e 100%); }
+    .pitch-bg { background: radial-gradient(circle at center, #11382a 0%, #061510 100%); }
     
-    .card-item { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+    .card-item { transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s; }
     .card-item.selected {
-      transform: translateY(-16px);
-      box-shadow: 0 0 18px rgba(52, 211, 153, 0.6);
+      transform: translateY(-14px);
+      box-shadow: 0 0 16px rgba(52, 211, 153, 0.6);
     }
     
-    /* 结算阶段卡牌跳动动画 */
-    .card-bounce {
-      animation: cardBounce 0.45s ease-in-out;
-    }
-    @keyframes cardBounce {
-      0%, 100% { transform: translateY(0) scale(1); }
-      50% { transform: translateY(-20px) scale(1.08); }
+    /* 打击感震撼动画 */
+    .shake { animation: screenShake 0.25s cubic-bezier(.36,.07,.19,.97) both; }
+    @keyframes screenShake {
+      10%, 90% { transform: translate3d(-1px, 0, 0); }
+      20%, 80% { transform: translate3d(2px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+      40%, 60% { transform: translate3d(4px, 0, 0); }
     }
 
-    /* 特殊强化卡牌闪烁光效 */
-    .captain-glow {
-      box-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+    .card-bounce { animation: cardBounce 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    @keyframes cardBounce {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.18) translateY(-10px); }
+      100% { transform: scale(1); }
     }
-    .commercial-glow {
-      box-shadow: 0 0 12px rgba(52, 211, 153, 0.6);
+
+    .goal-anim { animation: goalPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+    @keyframes goalPop {
+      0% { opacity: 0; transform: scale(0.3) rotate(-10deg); }
+      50% { opacity: 1; transform: scale(1.2) rotate(3deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0deg); }
     }
+
+    /* 星级边框 */
+    .star-1 { border-color: #94a3b8; }
+    .star-2 { border-color: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
+    .star-3 { border-color: #fbbf24; box-shadow: 0 0 12px rgba(251, 191, 36, 0.6); }
 
     /* 飘字特效 */
-    .floating-text {
-      animation: floatUp 0.8s ease-out forwards;
-    }
+    .floating-text { animation: floatUp 0.8s ease-out forwards; }
     @keyframes floatUp {
       0% { opacity: 0; transform: translateY(0) scale(0.8); }
-      30% { opacity: 1; transform: translateY(-15px) scale(1.1); }
-      100% { opacity: 0; transform: translateY(-35px) scale(1); }
+      30% { opacity: 1; transform: translateY(-15px) scale(1.2); }
+      100% { opacity: 0; transform: translateY(-40px) scale(1); }
     }
   </style>
 </head>
-<body class="min-h-screen p-4 md:p-6 flex flex-col justify-between">
+<body class="min-h-screen p-3 md:p-5 flex flex-col justify-between">
 
-  <!-- 1. 顶部状态栏 -->
-  <header class="w-full max-w-6xl mx-auto flex justify-between items-center bg-slate-900/80 border border-slate-700/60 rounded-xl p-4 mb-4 backdrop-blur-md">
-    <div class="flex items-center space-x-4 md:space-x-6">
-      <div class="text-xs uppercase tracking-widest text-slate-400">
-        关卡: <span class="text-emerald-400 font-bold text-sm">S1-2 特殊卡体验</span>
+  <!-- 1. 顶部状态与导航栏 -->
+  <header class="w-full max-w-6xl mx-auto flex flex-col gap-2 mb-2">
+    <div class="flex justify-between items-center bg-slate-900/90 border border-slate-700/60 rounded-xl p-3 backdrop-blur-md">
+      <div class="flex items-center space-x-3 md:space-x-6">
+        <div class="text-xs uppercase tracking-widest text-slate-400">
+          关卡: <span id="stage-name" class="text-rose-400 font-bold text-sm">BOSS 决战战役</span>
+        </div>
+        <div class="h-4 w-[1px] bg-slate-700"></div>
+        <div class="text-xs uppercase tracking-widest text-slate-400">
+          出牌: <span id="kickouts-count" class="font-number text-amber-400 font-bold text-base">4/4</span>
+        </div>
+        <div class="text-xs uppercase tracking-widest text-slate-400">
+          弃牌: <span id="discards-count" class="font-number text-red-400 font-bold text-base">3/3</span>
+        </div>
       </div>
-      <div class="h-4 w-[1px] bg-slate-700"></div>
-      <div class="text-xs uppercase tracking-widest text-slate-400">
-        出牌: <span id="kickouts-count" class="font-number text-amber-400 font-bold text-base">4/4</span>
-      </div>
-      <div class="text-xs uppercase tracking-widest text-slate-400">
-        弃牌: <span id="discards-count" class="font-number text-red-400 font-bold text-base">3/3</span>
+      
+      <div class="flex items-center gap-2">
+        <!-- 局外天赋树/俱乐部大楼入口按钮 -->
+        <button onclick="toggleTalentModal(true)" class="text-xs bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold px-3 py-1.5 rounded-lg shadow-[0_0_10px_rgba(147,51,234,0.3)] transition">
+          🏛️ 俱乐部建设 (天赋树)
+        </button>
+        <button onclick="randomizeBoss()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 px-2.5 py-1.5 rounded-lg text-slate-300">🎲 切换 Boss</button>
+        <div class="flex items-center space-x-2 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-lg">
+          <span class="text-amber-400 text-sm">💼 资金:</span>
+          <span id="cash-display" class="font-number text-amber-400 font-bold text-lg">$25</span>
+        </div>
       </div>
     </div>
-    <div class="flex items-center space-x-2 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg">
-      <span class="text-amber-400 text-sm">💼 资金:</span>
-      <span id="cash-display" class="font-number text-amber-400 font-bold text-lg">$15</span>
+
+    <!-- BOSS 负面机制条 -->
+    <div id="boss-banner" class="bg-rose-950/80 border-2 border-rose-500/80 rounded-xl p-2.5 flex items-center justify-between shadow-[0_0_15px_rgba(244,63,94,0.2)]">
+      <div class="flex items-center gap-2.5">
+        <span id="boss-icon" class="text-2xl">🌧️</span>
+        <div>
+          <div class="flex items-center gap-2">
+            <span id="boss-title" class="font-bold text-sm text-rose-200">客场大雨 (雨战)</span>
+            <span class="text-[10px] bg-rose-500 text-slate-950 font-bold px-1.5 py-0.2 rounded">BOSS DEBUFF</span>
+          </div>
+          <p id="boss-desc" class="text-xs text-rose-300/80 mt-0.5">所有【前锋 (FW)】卡牌的基础点数强行 -50%</p>
+        </div>
+      </div>
+      <div class="text-right shrink-0">
+        <span class="text-[10px] text-slate-400 block uppercase">通关需达到目标分</span>
+        <span id="boss-target-text" class="font-number font-bold text-amber-400 text-base">2,500</span>
+      </div>
     </div>
   </header>
 
-  <!-- 2. 主战斗区域 -->
-  <main class="w-full max-w-6xl mx-auto flex-1 grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+  <!-- 2. 主战区 -->
+  <main class="w-full max-w-6xl mx-auto flex-1 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
     
-    <!-- 左侧：战术与即时计分看板 -->
-    <section class="md:col-span-4 flex flex-col gap-4">
-      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex justify-between">
-          <span>主帅 (Joker)</span>
-          <span class="text-purple-400 font-number">1/5</span>
+    <!-- 左侧：主帅挂件槽位 + 看板 -->
+    <section class="md:col-span-4 flex flex-col gap-3">
+      
+      <!-- 主帅挂件 (Joker) 槽位区 -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex justify-between items-center">
+          <span>主帅挂件槽位 (Managers)</span>
+          <span id="manager-slots-count" class="text-purple-400 font-number">2/3</span>
         </div>
-        <div class="bg-gradient-to-br from-slate-900 via-purple-950/40 to-slate-900 border-2 border-purple-500/80 rounded-lg p-3 flex items-center gap-3">
-          <div class="w-10 h-14 bg-purple-900/50 border border-purple-400/50 rounded flex items-center justify-center text-xl shrink-0">👔</div>
-          <div>
-            <div class="font-bold text-sm text-purple-200">安切洛蒂</div>
-            <p class="text-xs text-slate-300 mt-0.5">阵型含3种以上位置时，倍率 <span class="text-rose-400 font-bold font-number">+6</span></p>
-          </div>
-        </div>
+        <div id="managers-container" class="flex flex-col gap-2"></div>
       </div>
 
       <!-- 即时计分看板 -->
-      <div class="bg-slate-900 border-2 border-slate-700/80 rounded-xl p-4 card-shadow flex flex-col gap-3">
-        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+      <div class="bg-slate-900 border-2 border-slate-700/80 rounded-xl p-3.5 card-shadow flex flex-col gap-2.5">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
           <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">拟选阵型</span>
           <span id="poker-hand-name" class="text-xs font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded">未选牌</span>
         </div>
 
-        <div class="flex items-center justify-between py-2">
-          <!-- 基础分 (Chips) -->
+        <div class="flex items-center justify-between py-1">
           <div class="flex flex-col items-center flex-1">
-            <span class="text-[10px] text-sky-400 font-bold uppercase mb-1">基础分 (CHIPS)</span>
-            <div id="display-chips" class="bg-sky-950/80 border-2 border-sky-400/80 text-sky-300 font-number font-bold text-2xl w-full py-1.5 rounded-lg text-center transition-all">0</div>
+            <span class="text-[10px] text-sky-400 font-bold uppercase mb-0.5">基础分 (CHIPS)</span>
+            <div id="display-chips" class="bg-sky-950/80 border-2 border-sky-400/80 text-sky-300 font-number font-bold text-xl w-full py-1 rounded-lg text-center">0</div>
           </div>
-          <span class="text-slate-500 font-bold text-xl px-2 mt-4">×</span>
-          <!-- 倍率 (Mult) -->
+          <span class="text-slate-500 font-bold text-lg px-2 mt-3">×</span>
           <div class="flex flex-col items-center flex-1">
-            <span class="text-[10px] text-rose-400 font-bold uppercase mb-1">倍率 (MULT)</span>
-            <div id="display-mult" class="bg-rose-950/80 border-2 border-rose-500/80 text-rose-300 font-number font-bold text-2xl w-full py-1.5 rounded-lg text-center transition-all">0</div>
+            <span class="text-[10px] text-rose-400 font-bold uppercase mb-0.5">倍率 (MULT)</span>
+            <div id="display-mult" class="bg-rose-950/80 border-2 border-rose-500/80 text-rose-300 font-number font-bold text-xl w-full py-1 rounded-lg text-center">0</div>
           </div>
         </div>
 
-        <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-2.5 flex justify-between items-center">
+        <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-2 flex justify-between items-center">
           <span class="text-xs text-slate-400 font-medium">预估得分:</span>
-          <span id="display-score" class="font-number font-bold text-amber-400 text-xl tracking-wider">0</span>
+          <span id="display-score" class="font-number font-bold text-amber-400 text-lg tracking-wider">0</span>
         </div>
 
         <div>
           <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-400">比赛目标分</span>
-            <span class="font-number text-slate-300"><span id="current-score">0</span> / <span id="target-score">1500</span></span>
+            <span class="text-slate-400">BOSS 目标得分</span>
+            <span class="font-number text-slate-300"><span id="current-score">0</span> / <span id="target-score">2500</span></span>
           </div>
           <div class="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800">
             <div id="score-progress" class="bg-gradient-to-r from-emerald-500 to-amber-400 h-full w-0 transition-all duration-500 rounded-full"></div>
@@ -131,39 +164,165 @@
       </div>
     </section>
 
-    <!-- 右侧：绿茵出牌区与手牌区 -->
-    <section class="md:col-span-8 flex flex-col gap-4">
-      <!-- 出牌区 -->
-      <div class="pitch-bg border-2 border-emerald-600/40 rounded-2xl p-4 min-h-[220px] flex flex-col justify-between items-center relative overflow-hidden card-shadow">
-        <div class="text-xs font-bold uppercase tracking-widest text-emerald-300/60 bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-500/20">
+    <!-- 右侧：球场与手牌 -->
+    <section class="md:col-span-8 flex flex-col gap-3">
+      <!-- 出牌区 (球场) -->
+      <div id="pitch-area" class="pitch-bg border-2 border-emerald-600/40 rounded-2xl p-4 min-h-[190px] flex flex-col justify-between items-center relative overflow-hidden card-shadow">
+        <div class="text-xs font-bold uppercase tracking-widest text-emerald-300/60 bg-emerald-950/40 px-3 py-0.5 rounded-full border border-emerald-500/20">
           球场出牌区
         </div>
+
+        <!-- GOAL 破门特效层 -->
+        <div id="goal-overlay" class="hidden absolute inset-0 bg-slate-950/80 z-20 flex flex-col items-center justify-center pointer-events-none">
+          <span class="font-title font-black text-5xl text-amber-400 tracking-wider goal-anim drop-shadow-[0_0_20px_rgba(251,191,36,0.8)]">GOAL!!!!!</span>
+          <span id="goal-score-banner" class="font-number font-bold text-xl text-emerald-400 mt-2">+0</span>
+        </div>
         
-        <!-- 结算卡牌平铺区 -->
-        <div id="played-cards-container" class="flex justify-center items-center gap-3 my-4 min-h-[128px] relative w-full">
-          <span class="text-xs text-emerald-400/50">点击下方手牌选择组合 (最多 5 张)</span>
+        <div id="played-cards-container" class="flex justify-center items-center gap-2 my-2 min-h-[115px] relative w-full">
+          <span class="text-xs text-emerald-400/50">点击手牌组合 (最多 5 张)</span>
         </div>
 
-        <div class="flex gap-4">
-          <button id="discard-btn" onclick="discardSelected()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-bold rounded-xl text-sm transition">弃牌</button>
-          <button id="shoot-btn" onclick="playHand()" class="px-8 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-title font-black text-base rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.4)]">射门 / 出牌 !</button>
+        <div class="flex gap-3">
+          <button id="discard-btn" onclick="discardSelected()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-bold rounded-xl text-xs transition">弃牌</button>
+          <button id="shoot-btn" onclick="playHand()" class="px-7 py-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-title font-black text-sm rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.4)]">射门 / 出牌 !</button>
         </div>
       </div>
 
-      <!-- 手牌展示区 -->
-      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-        <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex justify-between items-center">
-          <span>手牌区 <span class="text-[10px] text-slate-500 font-normal">（带 👑 队长卡 与 💵 商业卡）</span></span>
+      <!-- 手牌区 -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3">
+        <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex justify-between items-center">
+          <span>手牌区</span>
           <span id="selected-count" class="text-emerald-400 font-number">已选择 0/5</span>
         </div>
-        <div id="hand-cards-container" class="flex justify-center flex-wrap gap-2 md:gap-3"></div>
+        <div id="hand-cards-container" class="flex justify-center flex-wrap gap-2"></div>
       </div>
     </section>
-
   </main>
 
+  <!-- 3. 局外长线养成与天赋树（弹窗Modal） -->
+  <div id="talent-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border-2 border-purple-500/50 rounded-2xl max-w-2xl w-full p-5 card-shadow flex flex-col gap-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div>
+          <h2 class="font-title font-bold text-lg text-purple-300">🏛️ 俱乐部建设与天赋树</h2>
+          <p class="text-xs text-slate-400">使用积累的资金投资建设，永久提升你的球队战斗力</p>
+        </div>
+        <button onclick="toggleTalentModal(false)" class="text-slate-400 hover:text-white font-bold text-lg">✕</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        
+        <!-- 天赋 1：青训营升级 -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-bold text-sm text-emerald-400">🌱 青训营建设</span>
+              <span id="talent-youth-lvl" class="text-xs font-number text-slate-400">Lv.0 / 3</span>
+            </div>
+            <p class="text-xs text-slate-400 mb-3">永久提高发牌时获得 2 星/ 3 星高分球员卡及队长卡的概率。</p>
+          </div>
+          <button id="talent-youth-btn" onclick="upgradeTalent('youth')" class="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs rounded-lg transition">升级 ($10)</button>
+        </div>
+
+        <!-- 天赋 2：球场扩建 -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-bold text-sm text-sky-400">🏟️ 豪华主场建设</span>
+              <span id="talent-stadium-lvl" class="text-xs font-number text-slate-400">Lv.0 / 3</span>
+            </div>
+            <p class="text-xs text-slate-400 mb-3">提升比赛初始弃牌上限次数（每级 +1 弃牌次数）。</p>
+          </div>
+          <button id="talent-stadium-btn" onclick="upgradeTalent('stadium')" class="w-full py-1.5 bg-sky-600 hover:bg-sky-500 text-slate-950 font-bold text-xs rounded-lg transition">升级 ($15)</button>
+        </div>
+
+        <!-- 天赋 3：商业赞助签约 -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-bold text-sm text-amber-400">💼 商业合作中心</span>
+              <span id="talent-sponsor-lvl" class="text-xs font-number text-slate-400">Lv.0 / 3</span>
+            </div>
+            <p class="text-xs text-slate-400 mb-3">每次打出【商业卡】时额外多获得资金，且初始资金 +$5。</p>
+          </div>
+          <button id="talent-sponsor-btn" onclick="upgradeTalent('sponsor')" class="w-full py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs rounded-lg transition">升级 ($12)</button>
+        </div>
+
+        <!-- 天赋 4：名帅战术研讨会 -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-bold text-sm text-purple-400">📋 战术研讨室</span>
+              <span id="talent-tactics-lvl" class="text-xs font-number text-slate-400">Lv.0 / 3</span>
+            </div>
+            <p class="text-xs text-slate-400 mb-3">解锁第 3 个主帅挂件槽位，并提升基础阵型的倍率加成。</p>
+          </div>
+          <button id="talent-tactics-btn" onclick="upgradeTalent('tactics')" class="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-lg transition">升级 ($20)</button>
+        </div>
+
+      </div>
+
+      <div class="text-right border-t border-slate-800 pt-3">
+        <button onclick="toggleTalentModal(false)" class="px-5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl">返回比赛</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // 1. 基础数据结构与特殊类型定义
+    // 原生 Web Audio API 打击感音效合成器 (免除外部音频文件加载依赖)
+    class SoundFX {
+      constructor() {
+        this.ctx = null;
+      }
+
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+
+      // 卡牌跳跃/点击音效 (阶梯升高)
+      playPop(pitchStep = 0) {
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const freq = 300 + pitchStep * 60;
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.6, this.ctx.currentTime + 0.08);
+        
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.08);
+      }
+
+      // 重击射门/破门音效
+      playGoal() {
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.4);
+        
+        gain.gain.setValueAtTime(0.8, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.4);
+      }
+    }
+
+    const sfx = new SoundFX();
+
     const POSITIONS = {
       FW: { name: '前锋', color: 'border-rose-500 text-rose-400 bg-rose-500/20' },
       MF: { name: '中场', color: 'border-emerald-500 text-emerald-400 bg-emerald-500/20' },
@@ -173,9 +332,23 @@
 
     const ENHANCEMENTS = {
       NONE: { type: 'NONE', label: '' },
-      CAPTAIN: { type: 'CAPTAIN', label: '👑 队长', chipsBonus: 30, multBonus: 5, color: 'border-amber-400 captain-glow' },
-      COMMERCIAL: { type: 'COMMERCIAL', label: '💵 商业', cashBonus: 3, color: 'border-emerald-400 commercial-glow' }
+      CAPTAIN: { type: 'CAPTAIN', label: '👑 队长', chipsBonus: 30, multBonus: 5 },
+      COMMERCIAL: { type: 'COMMERCIAL', label: '💵 商业', cashBonus: 3 }
     };
+
+    const BOSS_LIST = [
+      { id: 'rainy_day', icon: '🌧️', title: '客场大雨 (雨战)', desc: '天气极差！所有【前锋 (FW)】卡的基础点数强行 -50%', targetScore: 2500 },
+      { id: 'corrupt_referee', icon: '🟨', title: '黑哨偏袒', desc: '主裁判严格限制！所有【👑 队长卡】的额外加成失效', targetScore: 2200 },
+      { id: 'park_the_bus', icon: '🚌', title: '密防巴士阵', desc: '对方严密死守！过关目标得分大幅提升至 3,800 分', targetScore: 3800 },
+      { id: 'high_press', icon: '⚡', title: '全场疯狗式逼抢', desc: '对方疯狂压迫！本次 Boss 战弃牌次数强行 -2', targetScore: 2400 }
+    ];
+
+    const ALL_MANAGERS = [
+      { id: 'pep', name: '瓜迪奥拉', avatar: '👔', desc: '手牌每多1张【中场 (MF)】，基础分 +25' },
+      { id: 'jose', name: '穆里尼奥', avatar: '🧥', desc: '打出全【后场/门将】阵型时，倍率 ×2' },
+      { id: 'klopp', name: '克洛普', avatar: '🧢', desc: '阵型含 3 种以上位置时，倍率 +8' },
+      { id: 'ancelotti', name: '安切洛蒂', avatar: '🤨', desc: '队长卡额外获得 +10 倍率加成' }
+    ];
 
     const HAND_PATTERNS = {
       GOLDEN_AXIS: { name: '黄金中轴线', baseChips: 60, baseMult: 4 },
@@ -188,40 +361,137 @@
     let gameState = {
       kickouts: 4,
       discards: 3,
-      cash: 15,
+      cash: 25,
       currentScore: 0,
-      targetScore: 1500,
+      targetScore: 2500,
+      activeBoss: BOSS_LIST[0],
+      equippedManagers: [ALL_MANAGERS[0], ALL_MANAGERS[2]],
       handCards: [],
       selectedIndices: [],
-      isAnimating: false
+      isAnimating: false,
+      talents: {
+        youth: 0,
+        stadium: 0,
+        sponsor: 0,
+        tactics: 0
+      }
     };
 
-    // 生成发牌（高概率带有队长卡与商业卡）
+    function randomizeBoss() {
+      if (gameState.isAnimating) return;
+      const randIdx = Math.floor(Math.random() * BOSS_LIST.length);
+      gameState.activeBoss = BOSS_LIST[randIdx];
+      gameState.targetScore = gameState.activeBoss.targetScore;
+      gameState.currentScore = 0;
+
+      // 受球场天赋影响的弃牌上限
+      const baseDiscards = gameState.activeBoss.id === 'high_press' ? 1 : 3;
+      gameState.discards = baseDiscards + gameState.talents.stadium;
+
+      document.getElementById('boss-icon').innerText = gameState.activeBoss.icon;
+      document.getElementById('boss-title').innerText = gameState.activeBoss.title;
+      document.getElementById('boss-desc').innerText = gameState.activeBoss.desc;
+      document.getElementById('boss-target-text').innerText = gameState.targetScore.toLocaleString();
+      document.getElementById('target-score').innerText = gameState.targetScore.toLocaleString();
+      document.getElementById('current-score').innerText = '0';
+      document.getElementById('score-progress').style.width = '0%';
+      document.getElementById('discards-count').innerText = `${gameState.discards}/${3 + gameState.talents.stadium}`;
+
+      updateScoreRadar();
+    }
+
     function createRandomCard(id) {
       const posKeys = Object.keys(POSITIONS);
       const pos = posKeys[Math.floor(Math.random() * posKeys.length)];
-      const value = Math.floor(Math.random() * 13) + 2; // 2 ~ 14
+      
+      // 青训营天赋提高数值与高星级概率
+      const youthLvl = gameState.talents.youth;
+      const baseVal = Math.floor(Math.random() * 11) + 2 + (youthLvl * 2);
 
-      // 30% 概率生成强化卡
+      let star = 1;
+      if (Math.random() < 0.1 + youthLvl * 0.1) star = 3;
+      else if (Math.random() < 0.3 + youthLvl * 0.1) star = 2;
+
       let enhancement = ENHANCEMENTS.NONE;
       const rand = Math.random();
-      if (rand < 0.18) enhancement = ENHANCEMENTS.CAPTAIN;
-      else if (rand < 0.35) enhancement = ENHANCEMENTS.COMMERCIAL;
+      if (rand < 0.22 + youthLvl * 0.05) enhancement = ENHANCEMENTS.CAPTAIN;
+      else if (rand < 0.38) enhancement = ENHANCEMENTS.COMMERCIAL;
 
-      return { id, pos, value, enhancement };
+      return { id, pos, value: baseVal, star, enhancement };
     }
 
-    function initHand() {
+    function initGame() {
       gameState.handCards = [];
       for (let i = 0; i < 8; i++) {
         gameState.handCards.push(createRandomCard(Date.now() + i));
       }
       gameState.selectedIndices = [];
+      renderManagers();
       renderHand();
-      updateScoreRadar();
+      randomizeBoss();
+      updateTalentUI();
     }
 
-    // 渲染手牌
+    function toggleTalentModal(show) {
+      const modal = document.getElementById('talent-modal');
+      if (show) modal.classList.remove('hidden');
+      else modal.classList.add('hidden');
+    }
+
+    function upgradeTalent(type) {
+      const costs = { youth: 10, stadium: 15, sponsor: 12, tactics: 20 };
+      const cost = costs[type];
+
+      if (gameState.cash >= cost && gameState.talents[type] < 3) {
+        gameState.cash -= cost;
+        gameState.talents[type]++;
+        document.getElementById('cash-display').innerText = `$${gameState.cash}`;
+
+        if (type === 'tactics' && gameState.talents.tactics === 1) {
+          gameState.equippedManagers.push(ALL_MANAGERS[3]); // 解锁安切洛蒂
+          renderManagers();
+        }
+
+        updateTalentUI();
+        sfx.playPop(3);
+      }
+    }
+
+    function updateTalentUI() {
+      const keys = ['youth', 'stadium', 'sponsor', 'tactics'];
+      keys.forEach(k => {
+        const lvl = gameState.talents[k];
+        document.getElementById(`talent-${k}-lvl`).innerText = `Lv.${lvl} / 3`;
+        const btn = document.getElementById(`talent-${k}-btn`);
+        if (lvl >= 3) {
+          btn.innerText = '已满级';
+          btn.disabled = true;
+          btn.className = 'w-full py-1.5 bg-slate-800 text-slate-500 font-bold text-xs rounded-lg';
+        }
+      });
+    }
+
+    function renderManagers() {
+      const container = document.getElementById('managers-container');
+      container.innerHTML = '';
+
+      gameState.equippedManagers.forEach((mgr) => {
+        const mgrEl = document.createElement('div');
+        mgrEl.className = 'bg-gradient-to-r from-purple-950/60 to-slate-900 border border-purple-500/50 rounded-lg p-2 flex items-center gap-2.5';
+        mgrEl.innerHTML = `
+          <div class="w-8 h-10 bg-purple-900/60 border border-purple-400/60 rounded flex items-center justify-center text-lg shrink-0">${mgr.avatar}</div>
+          <div class="overflow-hidden">
+            <div class="font-bold text-xs text-purple-200">${mgr.name}</div>
+            <div class="text-[10px] text-slate-300 truncate">${mgr.desc}</div>
+          </div>
+        `;
+        container.appendChild(mgrEl);
+      });
+
+      const maxSlots = gameState.talents.tactics > 0 ? 3 : 2;
+      document.getElementById('manager-slots-count').innerText = `${gameState.equippedManagers.length}/${maxSlots}`;
+    }
+
     function renderHand() {
       const container = document.getElementById('hand-cards-container');
       container.innerHTML = '';
@@ -230,31 +500,24 @@
         const isSelected = gameState.selectedIndices.includes(index);
         const posInfo = POSITIONS[card.pos];
         const enh = card.enhancement;
-        const valText = card.value === 11 ? 'J' : card.value === 12 ? 'Q' : card.value === 13 ? 'K' : card.value === 14 ? 'A' : card.value;
-
-        const cardEl = document.createElement('div');
-        const borderClass = enh.type !== 'NONE' ? enh.color : posInfo.color.split(' ')[0];
         
-        cardEl.className = `card-item relative w-20 h-28 md:w-24 md:h-36 bg-slate-900 border-2 ${borderClass} rounded-xl p-2 flex flex-col justify-between cursor-pointer card-shadow ${isSelected ? 'selected' : ''}`;
-        cardEl.onclick = () => toggleSelectCard(index);
-
-        // 特殊强化标志头标
-        let badgeHTML = '';
-        if (enh.type === 'CAPTAIN') {
-          badgeHTML = `<div class="absolute -top-2 -left-2 bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-title font-black text-[9px] px-1.5 py-0.5 rounded shadow">C</div>`;
-        } else if (enh.type === 'COMMERCIAL') {
-          badgeHTML = `<div class="absolute -top-2 -left-2 bg-emerald-500 text-slate-950 font-bold text-[9px] px-1 py-0.5 rounded shadow">$</div>`;
+        let displayVal = card.value;
+        if (gameState.activeBoss.id === 'rainy_day' && card.pos === 'FW') {
+          displayVal = Math.floor(card.value * 0.5);
         }
 
+        const cardEl = document.createElement('div');
+        cardEl.className = `card-item relative w-20 h-28 bg-slate-900 border-2 star-${card.star} rounded-xl p-2 flex flex-col justify-between cursor-pointer card-shadow ${isSelected ? 'selected' : ''}`;
+        cardEl.onclick = () => toggleSelectCard(index);
+
         cardEl.innerHTML = `
-          ${badgeHTML}
           <div class="flex justify-between items-start">
-            <span class="font-number font-bold text-base md:text-lg ${posInfo.color.split(' ')[1]}">${valText}</span>
+            <span class="font-number font-bold text-base ${card.pos === 'FW' && gameState.activeBoss.id === 'rainy_day' ? 'text-rose-400 font-black' : posInfo.color.split(' ')[1]}">${displayVal}</span>
             <span class="text-[9px] font-bold ${posInfo.color} px-1 rounded">${card.pos}</span>
           </div>
-          <div class="text-xl md:text-2xl text-center">${enh.type === 'CAPTAIN' ? '👑' : '⚽'}</div>
+          <div class="text-xl text-center">${enh.type === 'CAPTAIN' ? '👑' : '⚽'}</div>
           <div class="border-t border-slate-800 pt-0.5 text-center">
-            <span class="text-[9px] font-bold ${enh.type !== 'NONE' ? 'text-amber-400' : posInfo.color.split(' ')[1]}">${enh.type !== 'NONE' ? enh.label : posInfo.name}</span>
+            <span class="text-[8px] ${enh.type !== 'NONE' ? 'text-amber-400 font-bold' : 'text-slate-500'}">${enh.type !== 'NONE' ? enh.label : '普通'}</span>
           </div>
         `;
         container.appendChild(cardEl);
@@ -265,6 +528,7 @@
 
     function toggleSelectCard(index) {
       if (gameState.isAnimating) return;
+      sfx.playPop(gameState.selectedIndices.length);
       const idx = gameState.selectedIndices.indexOf(index);
       if (idx > -1) gameState.selectedIndices.splice(idx, 1);
       else if (gameState.selectedIndices.length < 5) gameState.selectedIndices.push(index);
@@ -272,7 +536,6 @@
       updateScoreRadar();
     }
 
-    // 牌型与预览估算
     function evaluateSelectedHand() {
       const selectedCards = gameState.selectedIndices.map(i => gameState.handCards[i]);
       if (selectedCards.length === 0) return null;
@@ -281,18 +544,16 @@
       let totalCardPoints = 0;
       let captainChipsBonus = 0;
       let captainMultBonus = 0;
-      let commercialCashBonus = 0;
 
       selectedCards.forEach(c => {
         posCounts[c.pos] = (posCounts[c.pos] || 0) + 1;
-        totalCardPoints += c.value;
+        let val = c.value;
+        if (gameState.activeBoss.id === 'rainy_day' && c.pos === 'FW') val = Math.floor(val * 0.5);
+        totalCardPoints += val;
 
-        // 统计强化加成
-        if (c.enhancement.type === 'CAPTAIN') {
+        if (c.enhancement.type === 'CAPTAIN' && gameState.activeBoss.id !== 'corrupt_referee') {
           captainChipsBonus += c.enhancement.chipsBonus;
           captainMultBonus += c.enhancement.multBonus;
-        } else if (c.enhancement.type === 'COMMERCIAL') {
-          commercialCashBonus += c.enhancement.cashBonus;
         }
       });
 
@@ -307,12 +568,22 @@
         else if (uniquePositions >= 2) pattern = HAND_PATTERNS.MULTI_LINE;
       }
 
-      let managerBonusMult = uniquePositions >= 3 ? 6 : 0;
+      let chips = pattern.baseChips + totalCardPoints + captainChipsBonus;
+      let mult = pattern.baseMult + captainMultBonus;
 
-      const chips = pattern.baseChips + totalCardPoints + captainChipsBonus;
-      const mult = pattern.baseMult + managerBonusMult + captainMultBonus;
+      const equippedIds = gameState.equippedManagers.map(m => m.id);
+      if (equippedIds.includes('pep')) {
+        const mfCount = selectedCards.filter(c => c.pos === 'MF').length;
+        chips += mfCount * 25;
+      }
+      if (equippedIds.includes('klopp') && uniquePositions >= 3) mult += 8;
+      if (equippedIds.includes('jose') && selectedCards.every(c => c.pos === 'DF' || c.pos === 'GK')) mult *= 2;
+      if (equippedIds.includes('ancelotti') && gameState.activeBoss.id !== 'corrupt_referee') {
+        const captainCount = selectedCards.filter(c => c.enhancement.type === 'CAPTAIN').length;
+        mult += captainCount * 10;
+      }
 
-      return { patternName: pattern.name, chips, mult, totalScore: chips * mult, commercialCashBonus };
+      return { patternName: pattern.name, chips, mult, totalScore: chips * mult };
     }
 
     function updateScoreRadar() {
@@ -334,7 +605,7 @@
     function discardSelected() {
       if (gameState.isAnimating || gameState.discards <= 0 || gameState.selectedIndices.length === 0) return;
       gameState.discards--;
-      document.getElementById('discards-count').innerText = `${gameState.discards}/3`;
+      document.getElementById('discards-count').innerText = `${gameState.discards}/${3 + gameState.talents.stadium}`;
 
       gameState.selectedIndices.sort((a, b) => b - a).forEach(index => {
         gameState.handCards.splice(index, 1);
@@ -344,13 +615,13 @@
       gameState.selectedIndices = [];
       renderHand();
       updateScoreRadar();
+      sfx.playPop(1);
     }
 
-    // 产生飘字特效函数
     function createFloatingText(targetNode, text, colorClass) {
       const rect = targetNode.getBoundingClientRect();
       const floatEl = document.createElement('div');
-      floatEl.className = `fixed font-number font-bold text-sm ${colorClass} z-50 pointer-events-none floating-text`;
+      floatEl.className = `fixed font-number font-bold text-xs ${colorClass} z-50 pointer-events-none floating-text`;
       floatEl.style.left = `${rect.left + rect.width / 4}px`;
       floatEl.style.top = `${rect.top - 10}px`;
       floatEl.innerText = text;
@@ -359,7 +630,26 @@
       setTimeout(() => floatEl.remove(), 800);
     }
 
-    // 核心出牌与特殊卡牌结算动画
+    // 数字滚动递增效果
+    function animateScoreRoll(startVal, addVal) {
+      const targetVal = startVal + addVal;
+      const duration = 600;
+      const startTime = performance.now();
+
+      function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const current = Math.floor(startVal + addVal * progress);
+        
+        document.getElementById('current-score').innerText = current.toLocaleString();
+
+        if (progress < 1) requestAnimationFrame(update);
+        else document.getElementById('current-score').innerText = targetVal.toLocaleString();
+      }
+      requestAnimationFrame(update);
+    }
+
+    // 结算出牌（含沉浸式音效与高能冲击特效）
     async function playHand() {
       const evalResult = evaluateSelectedHand();
       if (gameState.isAnimating || gameState.kickouts <= 0 || !evalResult) return;
@@ -374,65 +664,83 @@
       const selectedCards = gameState.selectedIndices.map(i => gameState.handCards[i]);
       const cardNodes = [];
 
-      // 渲染球场出牌区
       selectedCards.forEach(card => {
         const posInfo = POSITIONS[card.pos];
         const enh = card.enhancement;
-        const valText = card.value === 11 ? 'J' : card.value === 12 ? 'Q' : card.value === 13 ? 'K' : card.value === 14 ? 'A' : card.value;
         const cardEl = document.createElement('div');
-        const borderClass = enh.type !== 'NONE' ? enh.color : posInfo.color.split(' ')[0];
 
-        cardEl.className = `card-item relative w-20 h-28 bg-slate-900 border-2 ${borderClass} rounded-xl p-2 flex flex-col justify-between card-shadow`;
+        cardEl.className = `card-item relative w-20 h-28 bg-slate-900 border-2 star-${card.star} rounded-xl p-2 flex flex-col justify-between card-shadow`;
         cardEl.innerHTML = `
           <div class="flex justify-between items-start">
-            <span class="font-number font-bold text-base ${posInfo.color.split(' ')[1]}">${valText}</span>
+            <span class="font-number font-bold text-base ${posInfo.color.split(' ')[1]}">${card.value}</span>
             <span class="text-[9px] font-bold ${posInfo.color} px-1 rounded">${card.pos}</span>
           </div>
           <div class="text-xl text-center">${enh.type === 'CAPTAIN' ? '👑' : '⚽'}</div>
           <div class="border-t border-slate-800 pt-0.5 text-center">
-            <span class="text-[9px] font-bold ${enh.type !== 'NONE' ? 'text-amber-400' : posInfo.color.split(' ')[1]}">${enh.type !== 'NONE' ? enh.label : posInfo.name}</span>
+            <span class="text-[8px] text-amber-300">${posInfo.name}</span>
           </div>
         `;
         playedContainer.appendChild(cardEl);
         cardNodes.push({ node: cardEl, card });
       });
 
-      // 从手牌中剔除已出的牌
       gameState.selectedIndices.sort((a, b) => b - a).forEach(index => {
         gameState.handCards.splice(index, 1);
       });
       gameState.selectedIndices = [];
       renderHand();
 
-      // 依次播放结算与特殊特效
+      // 逐步弹出卡牌音效与视觉反馈
       for (let i = 0; i < cardNodes.length; i++) {
         const { node, card } = cardNodes[i];
-        await new Promise(r => setTimeout(r, 280));
+        await new Promise(r => setTimeout(r, 220));
         
         node.classList.add('card-bounce');
+        sfx.playPop(i + 1);
 
-        // 检查特殊属性并触发飘字动画与数值注入
-        if (card.enhancement.type === 'CAPTAIN') {
-          createFloatingText(node, '+30 分 / +5 倍率!', 'text-amber-400');
+        if (gameState.activeBoss.id === 'corrupt_referee' && card.enhancement.type === 'CAPTAIN') {
+          createFloatingText(node, '🟨 黑哨！队长加成无效', 'text-rose-400');
+        } else if (card.enhancement.type === 'CAPTAIN') {
+          createFloatingText(node, '👑 队长加成触发!', 'text-amber-400');
         } else if (card.enhancement.type === 'COMMERCIAL') {
-          createFloatingText(node, '+$3 资金!', 'text-emerald-400');
-          gameState.cash += 3;
+          const bonusCash = 3 + gameState.talents.sponsor;
+          createFloatingText(node, `💵 +$${bonusCash} 资金`, 'text-emerald-400');
+          gameState.cash += bonusCash;
           document.getElementById('cash-display').innerText = `$${gameState.cash}`;
         } else {
-          createFloatingText(node, `+${card.value} 分`, 'text-sky-400');
+          createFloatingText(node, `+${card.value} 点`, 'text-sky-400');
         }
       }
 
-      await new Promise(r => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 300));
 
-      // 总结算
+      // 震屏打击感 + 重音
+      document.body.classList.add('shake');
+      setTimeout(() => document.body.classList.remove('shake'), 300);
+      sfx.playGoal();
+
+      // 展示 GOAL 破门横幅动画
+      const goalOverlay = document.getElementById('goal-overlay');
+      document.getElementById('goal-score-banner').innerText = `+${evalResult.totalScore.toLocaleString()} 分`;
+      goalOverlay.classList.remove('hidden');
+
+      // 释放全屏礼花粒子
+      confetti({
+        particleCount: 70,
+        spread: 60,
+        origin: { y: 0.6 }
+      });
+
+      await new Promise(r => setTimeout(r, 850));
+      goalOverlay.classList.add('hidden');
+
+      // 滚屏数字增加
+      animateScoreRoll(gameState.currentScore, evalResult.totalScore);
       gameState.currentScore += evalResult.totalScore;
-      document.getElementById('current-score').innerText = gameState.currentScore.toLocaleString();
       
       const progressPercent = Math.min(100, (gameState.currentScore / gameState.targetScore) * 100);
       document.getElementById('score-progress').style.width = `${progressPercent}%`;
 
-      // 补发手牌
       while (gameState.handCards.length < 8) {
         gameState.handCards.push(createRandomCard(Date.now() + Math.random()));
       }
@@ -442,11 +750,11 @@
       updateScoreRadar();
 
       if (gameState.currentScore >= gameState.targetScore) {
-        setTimeout(() => alert('🎉 目标达成！GOAL! 胜利过关！'), 200);
+        setTimeout(() => alert('🎉 攻克 Boss！成功战胜强敌挺进下一轮！'), 200);
       }
     }
 
-    initHand();
+    initGame();
   </script>
 </body>
 </html>
