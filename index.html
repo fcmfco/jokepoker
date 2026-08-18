@@ -61,6 +61,15 @@
       30% { opacity: 1; transform: translateY(-15px) scale(1.2); }
       100% { opacity: 0; transform: translateY(-40px) scale(1); }
     }
+
+    /* 闪烁强提示 */
+    .pulse-warning {
+      animation: pulseBorder 1.5s infinite;
+    }
+    @keyframes pulseBorder {
+      0%, 100% { border-color: rgba(244, 63, 94, 0.8); box-shadow: 0 0 15px rgba(244, 63, 94, 0.5); }
+      50% { border-color: rgba(251, 113, 133, 1); box-shadow: 0 0 25px rgba(244, 63, 94, 0.8); }
+    }
   </style>
 </head>
 <body class="min-h-screen p-3 md:p-5 flex flex-col justify-between">
@@ -78,6 +87,10 @@
         </div>
         <div class="text-xs uppercase tracking-widest text-slate-400">
           弃牌: <span id="discards-count" class="font-number text-red-400 font-bold text-base">3/3</span>
+        </div>
+        <div class="h-4 w-[1px] bg-slate-700"></div>
+        <div class="text-xs uppercase tracking-widest text-slate-400">
+          战术蓄力: <span id="tactical-buff-count" class="font-number text-sky-400 font-bold text-base">+0%</span>
         </div>
       </div>
       
@@ -149,7 +162,10 @@
 
         <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-2 flex justify-between items-center">
           <span class="text-xs text-slate-400 font-medium">预估得分:</span>
-          <span id="display-score" class="font-number font-bold text-amber-400 text-lg tracking-wider">0</span>
+          <div class="text-right">
+            <span id="display-score" class="font-number font-bold text-amber-400 text-lg tracking-wider">0</span>
+            <span id="display-buff-tag" class="hidden text-[10px] text-sky-300 ml-1 font-bold bg-sky-900/60 px-1 rounded">蓄力+15%</span>
+          </div>
         </div>
 
         <div>
@@ -182,17 +198,28 @@
           <span class="text-xs text-emerald-400/50">点击手牌组合 (最多 5 张)</span>
         </div>
 
-        <div class="flex gap-3">
+        <div class="flex gap-3 items-center flex-wrap justify-center">
+          <button id="pass-btn" onclick="passTurn()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 border border-amber-500/60 text-amber-300 font-bold rounded-xl text-xs transition flex items-center gap-1 shadow-[0_0_10px_rgba(245,158,11,0.15)]" title="当手牌组不出大倍率牌型时，可战略性放弃一回合出牌机会：重置调整手牌，并为下一次射门积蓄+15%战术加成！">
+            <span>🛡️</span> 战略过牌
+          </button>
           <button id="discard-btn" onclick="discardSelected()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-bold rounded-xl text-xs transition">弃牌</button>
           <button id="shoot-btn" onclick="playHand()" class="px-7 py-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-title font-black text-sm rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.4)]">射门 / 出牌 !</button>
+          <!-- 强制弃牌按钮（当手牌 > 5 时提示） -->
+          <button id="force-discard-btn" onclick="confirmForceDiscard()" class="hidden px-6 py-1.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs rounded-xl transition shadow-[0_0_15px_rgba(244,63,94,0.5)]">确认强制弃牌 (不耗次数)</button>
         </div>
       </div>
 
       <!-- 手牌区 -->
-      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3">
+      <div id="hand-container-box" class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 transition-all duration-300">
         <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex justify-between items-center">
-          <span>手牌区</span>
-          <span id="selected-count" class="text-emerald-400 font-number">已选择 0/5</span>
+          <div class="flex items-center gap-2">
+            <span>手牌区</span>
+            <span id="hand-limit-tag" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700">上限: 5张</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="selected-count" class="text-emerald-400 font-number">已选择 0/5</span>
+            <span id="over-limit-notice" class="hidden text-xs font-bold text-rose-400 bg-rose-950/80 border border-rose-500/50 px-2.5 py-0.5 rounded-full animate-pulse">⚠️ 手牌超限！请选择多余手牌弃至5张以内</span>
+          </div>
         </div>
         <div id="hand-cards-container" class="flex justify-center flex-wrap gap-2"></div>
       </div>
@@ -319,6 +346,25 @@
         osc.start();
         osc.stop(this.ctx.currentTime + 0.4);
       }
+
+      // 战略过牌/战术调整音效
+      playPass() {
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(440, this.ctx.currentTime + 0.15);
+        
+        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.15);
+      }
     }
 
     const sfx = new SoundFX();
@@ -361,6 +407,7 @@
     let gameState = {
       kickouts: 4,
       discards: 3,
+      tacticalBuffRatio: 0, // 战略过牌积累的战术加成倍率
       cash: 25,
       currentScore: 0,
       targetScore: 2500,
@@ -383,6 +430,7 @@
       gameState.activeBoss = BOSS_LIST[randIdx];
       gameState.targetScore = gameState.activeBoss.targetScore;
       gameState.currentScore = 0;
+      gameState.tacticalBuffRatio = 0;
 
       // 受球场天赋影响的弃牌上限
       const baseDiscards = gameState.activeBoss.id === 'high_press' ? 1 : 3;
@@ -396,8 +444,10 @@
       document.getElementById('current-score').innerText = '0';
       document.getElementById('score-progress').style.width = '0%';
       document.getElementById('discards-count').innerText = `${gameState.discards}/${3 + gameState.talents.stadium}`;
+      document.getElementById('tactical-buff-count').innerText = `+${Math.round(gameState.tacticalBuffRatio * 100)}%`;
 
       updateScoreRadar();
+      checkHandLimitState();
     }
 
     function createRandomCard(id) {
@@ -422,7 +472,9 @@
 
     function initGame() {
       gameState.handCards = [];
-      for (let i = 0; i < 8; i++) {
+      gameState.tacticalBuffRatio = 0;
+      // 初始发5张牌
+      for (let i = 0; i < 5; i++) {
         gameState.handCards.push(createRandomCard(Date.now() + i));
       }
       gameState.selectedIndices = [];
@@ -524,6 +576,96 @@
       });
 
       document.getElementById('selected-count').innerText = `已选择 ${gameState.selectedIndices.length}/5`;
+      checkHandLimitState();
+    }
+
+    // 检查手牌超限状态与 UI 逻辑
+    function checkHandLimitState() {
+      const handBox = document.getElementById('hand-container-box');
+      const overNotice = document.getElementById('over-limit-notice');
+      const passBtn = document.getElementById('pass-btn');
+      const discardBtn = document.getElementById('discard-btn');
+      const shootBtn = document.getElementById('shoot-btn');
+      const forceDiscardBtn = document.getElementById('force-discard-btn');
+
+      const isOverLimit = gameState.handCards.length > 5;
+
+      if (isOverLimit) {
+        handBox.classList.add('pulse-warning', 'border-rose-500/80');
+        overNotice.classList.remove('hidden');
+        
+        // 强制禁用普通动作按键
+        if (passBtn) passBtn.classList.add('hidden');
+        discardBtn.classList.add('hidden');
+        shootBtn.classList.add('hidden');
+        forceDiscardBtn.classList.remove('hidden');
+
+        // 计算需要选择弃掉多少张牌
+        const neededToDiscard = gameState.handCards.length - 5;
+        const selectedCount = gameState.selectedIndices.length;
+
+        if (selectedCount >= neededToDiscard) {
+          forceDiscardBtn.disabled = false;
+          forceDiscardBtn.innerText = `确认弃牌 ${selectedCount} 张 (剩 ${gameState.handCards.length - selectedCount} 张手牌)`;
+          forceDiscardBtn.className = "px-6 py-1.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs rounded-xl transition shadow-[0_0_15px_rgba(244,63,94,0.5)] cursor-pointer opacity-100";
+        } else {
+          forceDiscardBtn.disabled = true;
+          forceDiscardBtn.innerText = `还需选择 ${neededToDiscard - selectedCount} 张牌弃置 (使其<=5张)`;
+          forceDiscardBtn.className = "px-6 py-1.5 bg-slate-800 border border-slate-700 text-slate-500 font-bold text-xs rounded-xl cursor-not-allowed opacity-70";
+        }
+      } else {
+        handBox.classList.remove('pulse-warning', 'border-rose-500/80');
+        overNotice.classList.add('hidden');
+        
+        if (passBtn) passBtn.classList.remove('hidden');
+        discardBtn.classList.remove('hidden');
+        shootBtn.classList.remove('hidden');
+        forceDiscardBtn.classList.add('hidden');
+      }
+    }
+
+    // 战略过牌 (Strategic Pass) 逻辑
+    function passTurn() {
+      if (gameState.isAnimating || gameState.handCards.length > 5) return;
+      
+      sfx.playPass();
+      
+      // 清空选中
+      gameState.selectedIndices = [];
+      
+      // 战术加成递增 +15%
+      gameState.tacticalBuffRatio += 0.15;
+      document.getElementById('tactical-buff-count').innerText = `+${Math.round(gameState.tacticalBuffRatio * 100)}%`;
+
+      // 重新调整更换所有手牌（保留5张）
+      gameState.handCards = [];
+      for (let i = 0; i < 5; i++) {
+        gameState.handCards.push(createRandomCard(Date.now() + i));
+      }
+
+      const pitchArea = document.getElementById('pitch-area');
+      createFloatingText(pitchArea, '🛡️ 战略过牌！手牌已重置，战术加成 +15%', 'text-amber-300 font-bold');
+
+      renderHand();
+      updateScoreRadar();
+    }
+
+    // 确认摸牌阶段超限后的免费弃牌（不消耗局内总弃牌次数）
+    function confirmForceDiscard() {
+      if (gameState.isAnimating) return;
+      const neededToDiscard = gameState.handCards.length - 5;
+      if (gameState.selectedIndices.length < neededToDiscard) return;
+
+      sfx.playPop(2);
+
+      // 按从大到小排序索引移除
+      gameState.selectedIndices.sort((a, b) => b - a).forEach(index => {
+        gameState.handCards.splice(index, 1);
+      });
+
+      gameState.selectedIndices = [];
+      renderHand();
+      updateScoreRadar();
     }
 
     function toggleSelectCard(index) {
@@ -531,12 +673,19 @@
       sfx.playPop(gameState.selectedIndices.length);
       const idx = gameState.selectedIndices.indexOf(index);
       if (idx > -1) gameState.selectedIndices.splice(idx, 1);
-      else if (gameState.selectedIndices.length < 5) gameState.selectedIndices.push(index);
+      else {
+        // 如果手牌未超限，最多选 5 张
+        if (gameState.handCards.length <= 5 && gameState.selectedIndices.length >= 5) return;
+        gameState.selectedIndices.push(index);
+      }
       renderHand();
       updateScoreRadar();
     }
 
     function evaluateSelectedHand() {
+      // 超限时不能计算与打出射门
+      if (gameState.handCards.length > 5) return null;
+
       const selectedCards = gameState.selectedIndices.map(i => gameState.handCards[i]);
       if (selectedCards.length === 0) return null;
 
@@ -583,16 +732,23 @@
         mult += captainCount * 10;
       }
 
-      return { patternName: pattern.name, chips, mult, totalScore: chips * mult };
+      // 计算战术过牌加成
+      let rawTotal = chips * mult;
+      let finalTotal = Math.round(rawTotal * (1 + gameState.tacticalBuffRatio));
+
+      return { patternName: pattern.name, chips, mult, rawTotal, totalScore: finalTotal };
     }
 
     function updateScoreRadar() {
       const evalResult = evaluateSelectedHand();
+      const buffTag = document.getElementById('display-buff-tag');
+
       if (!evalResult) {
-        document.getElementById('poker-hand-name').innerText = '未选牌';
+        document.getElementById('poker-hand-name').innerText = gameState.handCards.length > 5 ? '手牌超限中' : '未选牌';
         document.getElementById('display-chips').innerText = '0';
         document.getElementById('display-mult').innerText = '0';
         document.getElementById('display-score').innerText = '0';
+        if (buffTag) buffTag.classList.add('hidden');
         return;
       }
 
@@ -600,17 +756,32 @@
       document.getElementById('display-chips').innerText = evalResult.chips;
       document.getElementById('display-mult').innerText = evalResult.mult;
       document.getElementById('display-score').innerText = evalResult.totalScore.toLocaleString();
+
+      if (gameState.tacticalBuffRatio > 0) {
+        if (buffTag) {
+          buffTag.innerText = `蓄力+${Math.round(gameState.tacticalBuffRatio * 100)}%`;
+          buffTag.classList.remove('hidden');
+        }
+      } else {
+        if (buffTag) buffTag.classList.add('hidden');
+      }
     }
 
+    // 主动弃牌 (消耗 1 次局内弃牌次数)
     function discardSelected() {
-      if (gameState.isAnimating || gameState.discards <= 0 || gameState.selectedIndices.length === 0) return;
+      if (gameState.isAnimating || gameState.discards <= 0 || gameState.selectedIndices.length === 0 || gameState.handCards.length > 5) return;
       gameState.discards--;
       document.getElementById('discards-count').innerText = `${gameState.discards}/${3 + gameState.talents.stadium}`;
 
+      const discardCount = gameState.selectedIndices.length;
       gameState.selectedIndices.sort((a, b) => b - a).forEach(index => {
         gameState.handCards.splice(index, 1);
       });
-      while (gameState.handCards.length < 8) gameState.handCards.push(createRandomCard(Date.now() + Math.random()));
+
+      // 弃牌后固定补充 2 张牌（或补满至至少有牌）
+      for (let i = 0; i < 2; i++) {
+        gameState.handCards.push(createRandomCard(Date.now() + Math.random() + i));
+      }
 
       gameState.selectedIndices = [];
       renderHand();
@@ -651,6 +822,7 @@
 
     // 结算出牌（含沉浸式音效与高能冲击特效）
     async function playHand() {
+      if (gameState.handCards.length > 5) return;
       const evalResult = evaluateSelectedHand();
       if (gameState.isAnimating || gameState.kickouts <= 0 || !evalResult) return;
 
@@ -738,11 +910,16 @@
       animateScoreRoll(gameState.currentScore, evalResult.totalScore);
       gameState.currentScore += evalResult.totalScore;
       
+      // 射门完成后，清空战术蓄力加成
+      gameState.tacticalBuffRatio = 0;
+      document.getElementById('tactical-buff-count').innerText = `+0%`;
+
       const progressPercent = Math.min(100, (gameState.currentScore / gameState.targetScore) * 100);
       document.getElementById('score-progress').style.width = `${progressPercent}%`;
 
-      while (gameState.handCards.length < 8) {
-        gameState.handCards.push(createRandomCard(Date.now() + Math.random()));
+      // 固定只能摸 2 张牌
+      for (let i = 0; i < 2; i++) {
+        gameState.handCards.push(createRandomCard(Date.now() + Math.random() + i));
       }
       
       gameState.isAnimating = false;
